@@ -35,21 +35,21 @@ async fn main() -> anyhow::Result<()> {
     let mut tasks: Vec<tokio::task::JoinHandle<Result<(), anyhow::Error>>> = Vec::new();
 
     for account in accounts {
-        let account_clone = Arc::new(account);
+        let account_clone: Arc<utils::Account> = Arc::new(account);
         let future: Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> = match choice {
             1 => {
                 Box::pin(async move {
-                    Arc::clone(&account_clone).sanctum_register().map_ok(|_| ()).map_err(|e| e.into()).await
+                    account_clone.sanctum_register().map_ok(|_| ()).map_err(|e| e.into()).await
                 })
             },
             2 => {
                 Box::pin(async move {
-                    Arc::clone(&account_clone).sanctum_swap().map_ok(|_| ()).map_err(|e| e.into()).await
+                    account_clone.sanctum_swap().map_ok(|_| ()).map_err(|e| e.into()).await
                 })
             },
             3 => {
                 Box::pin(async move {
-                    Arc::clone(&account_clone).check_profile().map_ok(|_| ()).map_err(|e| e.into()).await
+                    account_clone.check_profile().map_ok(|_| ()).map_err(|e| e.into()).await
                 })
             },
             _ => {
