@@ -38,21 +38,18 @@ async fn main() -> anyhow::Result<()> {
         let account_clone = Arc::new(account);
         let future: Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> = match choice {
             1 => {
-                let account_clone = Arc::clone(&account_clone);
                 Box::pin(async move {
-                    account_clone.sanctum_register().map_ok(|_| ()).map_err(|e| e.into()).await
+                    Arc::clone(&account_clone).sanctum_register().map_ok(|_| ()).map_err(|e| e.into()).await
                 })
             },
             2 => {
-                let account_clone = Arc::clone(&account_clone);
                 Box::pin(async move {
-                    account_clone.sanctum_swap().map_ok(|_| ()).map_err(|e| e.into()).await
+                    Arc::clone(&account_clone).sanctum_swap().map_ok(|_| ()).map_err(|e| e.into()).await
                 })
             },
             3 => {
-                let account_clone = Arc::clone(&account_clone);
                 Box::pin(async move {
-                    account_clone.check_profile().map_ok(|_| ()).map_err(|e| e.into()).await
+                    Arc::clone(&account_clone).check_profile().map_ok(|_| ()).map_err(|e| e.into()).await
                 })
             },
             _ => {
