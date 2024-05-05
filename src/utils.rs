@@ -7,7 +7,8 @@ use rand::Rng;
 use serde::{
     Deserialize,
     de::{self, Deserializer, Visitor}
-};use solana_sdk::signature::Keypair;
+};
+use solana_sdk::signature::Keypair;
 use std::{
     sync::Arc,
     str::FromStr
@@ -29,6 +30,8 @@ pub struct Account {
     pub keypair: Arc<Keypair>,
     pub client: Arc<RpcClient>,
     pub inf_amount: u64,
+    pub web2_client: reqwest::Client,
+    pub config: Config
 }
 
 pub async fn read_config(
@@ -44,6 +47,9 @@ pub async fn read_config(
 pub async fn prepapre_accounts(
     config: Config
 ) -> anyhow::Result<Vec<Account>> {
+    let mut headers: reqwest::header::HeaderMap = reqwest::header::HeaderMap::new();
+    headers.insert("Content-Type", "application/json".parse().unwrap());
+
     let keys: Vec<Arc<Keypair>> = tokio::fs::read_to_string("./keys.txt")
         .await?
         .trim()
@@ -52,10 +58,23 @@ pub async fn prepapre_accounts(
         .map(Arc::new)
         .collect::<Vec<_>>();
 
+    let proxy: Vec<String> = tokio::fs::read_to_string("./proxy.txt")
+        .await?
+        .trim()
+        .split("\n")
+        .map(String::from)
+        .collect::<Vec<_>>();
+
     let mut accounts: Vec<Account> = Vec::new();
     
-    for key in keys {
+    for (key, proxy) in keys.iter().zip(proxy) {
         let client: Arc<RpcClient> = Arc::new(RpcClient::new(config.http_node_url.clone()));
+
+        
+        let web2_client: reqwest::Client = reqwest::Client::builder()
+            .proxy(reqwest::Proxy::all(proxy)?)
+            .default_headers(headers.clone())
+            .build()?;
 
         let inf_amount: u64 = if config.amount[0] == config.amount[1] {
             (config.amount[0] * 1_000_000_000f64) as u64
@@ -64,15 +83,16 @@ pub async fn prepapre_accounts(
         }; // 10**9
 
         accounts.push(Account {
-            keypair: key,
+            keypair: key.clone(),
             client: client,
             inf_amount: inf_amount,
+            web2_client: web2_client,
+            config: config.clone()
         });
     }
 
     Ok(accounts)
 }
-
 
 
 pub struct OptionF64Visitor;

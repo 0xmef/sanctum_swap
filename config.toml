@@ -1,7 +1,7 @@
 # The number of threads to use for the training
-threads = 5
+threads = 2
 # INF amount choose random from x to y
-amount = [0.001, 0.0011] 
+amount = [0.01, 0.011] 
 # Solana http node url
 http_node_url = "https://api.mainnet-beta.solana.com"
 # max retries for sanctum swap
