@@ -59,7 +59,7 @@ pub async fn prepapre_accounts(
     let mut headers: reqwest::header::HeaderMap = reqwest::header::HeaderMap::new();
     headers.insert("Content-Type", "application/json".parse().unwrap());
 
-    let keys: Vec<Arc<Keypair>> = tokio::fs::read_to_string("./keys.txt")
+    let keys: Vec<Arc<Keypair>> = tokio::fs::read_to_string("./data/keys.txt")
         .await?
         .trim()
         .split("\n")
@@ -67,7 +67,7 @@ pub async fn prepapre_accounts(
         .map(Arc::new)
         .collect::<Vec<_>>();
 
-    let proxy: Vec<String> = tokio::fs::read_to_string("./proxy.txt")
+    let proxy: Vec<String> = tokio::fs::read_to_string("./data/proxy.txt")
         .await?
         .trim()
         .split("\n")
@@ -79,7 +79,6 @@ pub async fn prepapre_accounts(
     for (key, proxy) in keys.iter().zip(proxy) {
         let client: Arc<RpcClient> = Arc::new(RpcClient::new(config.http_node_url.clone()));
 
-        
         let web2_client: reqwest::Client = reqwest::Client::builder()
             .proxy(reqwest::Proxy::all(proxy)?)
             .default_headers(headers.clone())

@@ -1,4 +1,4 @@
-# The number of threads to use for the training
+# The number of threads
 threads = 2
 # INF amount choose random from x to y
 amount = [0.01, 0.011] 

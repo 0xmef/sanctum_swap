@@ -2,6 +2,10 @@ use anyhow::Ok;
 use serde::{
     Deserialize, Serialize,
 };
+use tokio::{
+    fs::File,
+    io::AsyncWriteExt,
+};
 use solana_sdk::{
     commitment_config::CommitmentConfig,
     signature::{Signature, Signer}, 
@@ -23,7 +27,19 @@ struct QuoteResponse {
     #[serde(deserialize_with = "deserialize_option_f64")]
     out_amount: Option<f64>,
     swap_src: String,
-}   
+}
+
+#[derive(Serialize, Debug)]
+struct  PriorityFee {
+    unit_limit: u64,
+    unit_price_micro_lamports: u64,
+}
+
+#[derive(Serialize, Debug)]
+struct PriorityFeeOption {
+    #[serde(rename = "Manual")]
+    manual: PriorityFee,
+}
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +51,7 @@ struct SwapRequest {
     quoted_amount: String,
     mode: String,
     swap_src: String,
+    priority_fee: PriorityFeeOption
 }
 
 #[derive(Deserialize, Debug)]
@@ -113,8 +130,16 @@ impl Account {
         };
         
         let inf_balance: f64 = self.check_inf_balance().await?;
+        let string: String = format!("{}|EXP:{}|INF:{}", self.keypair.pubkey(), exp, inf_balance);
 
-        println!("{}|EXP:{}|INF:{}", self.keypair.pubkey(), exp, inf_balance);
+        let mut file: File = tokio::fs::OpenOptions::new()
+            .append(true)
+            .open("./data/check_results.txt")
+            .await?;
+    
+        file.write_all(format!("{}\n", string).as_bytes()).await?;
+
+        println!("{}", string);
 
         Ok(())
     }
@@ -179,6 +204,12 @@ impl Account {
                 quoted_amount: quote_response.out_amount.unwrap_or(0.0).to_string(),
                 mode: "ExactIn".to_string(),
                 swap_src: quote_response.swap_src.to_string(),
+                priority_fee: PriorityFeeOption {
+                    manual: PriorityFee {
+                        unit_limit: 300000,
+                        unit_price_micro_lamports: 300000,
+                    }
+                }
             };
 
             let swap_response: SwapResponse = self.web2_client.post("https://sanctum-s-api.fly.dev/v1/swap")

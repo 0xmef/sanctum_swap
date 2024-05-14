@@ -1,0 +1,5 @@
+pubkey|EXP:int|INF:float
+pubkey|EXP:int|INF:float
+pubkey|EXP:int|INF:float
+pubkey|EXP:int|INF:float
+pubkey|EXP:int|INF:float
