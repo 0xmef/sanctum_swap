@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     let accounts: Vec<utils::Account> = utils::prepapre_accounts(config.clone()).await.expect("failed to prepare accounts");
 
     println!("Upload {} accounts", accounts.len());
-    println!("Menu:\n1 - Register sanctum accounts\n2 - Swap SOL to INF\n3 - Check EXP count");
+    println!("Menu:\n1 - Register sanctum accounts\n2 - Swap SOL to INF\n3 - Check EXP|INF");
 
     let stdin: std::io::Stdin = std::io::stdin();
     let mut buffer = String::new();
@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
             },
             _ => {
                 println!("Invalid choice");
-                continue;
+                break;
             }
         };
         let task = tokio::spawn(process_account(Arc::clone(&semaphore), future).map(|_| Ok(())));

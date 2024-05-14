@@ -1,19 +1,19 @@
+use anyhow::Ok;
 use serde::{
     Deserialize, Serialize,
 };
 use solana_sdk::{
     commitment_config::CommitmentConfig,
-    signature::{Signature, Signer},
-    transaction::VersionedTransaction,
+    signature::{Signature, Signer}, 
+    transaction::VersionedTransaction
 };
 use solana_client::{
     rpc_config::RpcSendTransactionConfig,
     client_error::ClientError,
 };
+use solana_sdk::program_pack::Pack;
 use crate::utils::{
-    deserialize_option_f64,
-    base64_deserialize,
-    Account
+    self, base64_deserialize, deserialize_option_f64, Account, INF_TOKEN
 };
 
 
@@ -23,7 +23,7 @@ struct QuoteResponse {
     #[serde(deserialize_with = "deserialize_option_f64")]
     out_amount: Option<f64>,
     swap_src: String,
-}
+}   
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -47,8 +47,8 @@ struct SwapResponse {
 impl Account {
 
     pub async fn get_inf_price(&self) -> anyhow::Result<f64> {
-        let url: &str = "https://sanctum-extra-api.shuttleapp.rs/v1/sol-value/current?lst=INF";
-        
+        let url: &str = "https://sanctum-extra-api.ngrok.dev/v1/sol-value/current?lst=INF";
+
         let resp: reqwest::Response = self.web2_client
             .get(url)
             .send()
@@ -62,16 +62,15 @@ impl Account {
         Ok(inf_price)
     }
 
-    pub async fn check_profile(&self) -> anyhow::Result<u64> {
-        let user_profile = self.web2_client.get("https://sanctum-wonderland-season1-api.shuttleapp.rs/s1/user/full")
+    pub async fn check_esist(&self) -> anyhow::Result<u64> {
+        let user_profile = self.web2_client.get("https://wonderland-api2.ngrok.dev/s1/user/full")
             .query(&[("pk", &self.keypair.pubkey().to_string())])
             .send()
             .await?;
-
+    
         match user_profile.status() {
             reqwest::StatusCode::OK => {
                 let exp: u64 = user_profile.json::<serde_json::Value>().await?["totalExp"].to_string().parse::<u64>()?;
-                println!("{} have {} exp", self.keypair.pubkey(), exp);
                 return  Ok(exp);
             },
             _ => {
@@ -80,12 +79,52 @@ impl Account {
         }
     }
 
+    pub async fn check_inf_balance(&self) -> anyhow::Result<f64> {
+
+        let inf_balance = spl_token::state::Account::unpack(
+            &self
+                .client
+                .get_account_with_commitment(
+                    &spl_associated_token_account::get_associated_token_address(
+                        &self.keypair.pubkey(),
+                        &utils::INF_TOKEN,
+                    ),
+                    CommitmentConfig::confirmed(),
+                )
+                .await
+                .map(|e| e.value.map(|d| d.data).unwrap_or(vec![]))
+                .unwrap_or(vec![]),
+        )
+        .map(|e| e.amount)
+        .unwrap_or(0);
+        
+        Ok(inf_balance as f64 / 1000000000.0)
+    }
+
+    pub async fn check_profile(&self) -> anyhow::Result<()> {
+        let user_exp_result: Result<u64, anyhow::Error> = self.check_esist().await;
+
+        let exp: u64 = match user_exp_result {
+            anyhow::Result::Ok(exp) => exp,
+            Err(_) => {
+                println!("{} not registered", self.keypair.pubkey());
+                return Ok(());
+            }
+        };
+        
+        let inf_balance: f64 = self.check_inf_balance().await?;
+
+        println!("{}|EXP:{}|INF:{}", self.keypair.pubkey(), exp, inf_balance);
+
+        Ok(())
+    }
+
 
     pub async fn sanctum_register(&self) -> anyhow::Result<()> {
-        let user_exp: Result<u64, anyhow::Error> = self.check_profile().await;
+        let user_exp: Result<u64, anyhow::Error> = self.check_esist().await;
 
         match user_exp {
-            Ok(_) => {
+            anyhow::Result::Ok(_) => {
                 println!("Skip {} already registered", self.keypair.pubkey());
                 return Ok(());
             },
@@ -99,7 +138,7 @@ impl Account {
         let signature: Signature = self.keypair.sign_message(message.as_bytes());
         let signature_base58: String = bs58::encode(signature).into_string();
 
-        let user_register = self.web2_client.post("https://sanctum-wonderland-season1-api.shuttleapp.rs/s1/onboard")
+        let user_register = self.web2_client.post("https://wonderland-api2.ngrok.dev/s1/onboard")
             .json(&serde_json::json!({
                 "pk": self.keypair.pubkey().to_string(),
                 "sig": signature_base58,
@@ -123,7 +162,7 @@ impl Account {
             let quote_response: QuoteResponse = self.web2_client.get("https://sanctum-s-api.fly.dev/v1/swap/quote")
                 .query(&[
                     ("input", "So11111111111111111111111111111111111111112"),
-                    ("outputLstMint", "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm"),
+                    ("outputLstMint", &*INF_TOKEN.to_string()),
                     ("amount", &sol_lamports_in.to_string()),
                     ("mode", "ExactIn"),
                 ])
@@ -134,7 +173,7 @@ impl Account {
 
             let swap_request_data: SwapRequest = SwapRequest {
                 input: "So11111111111111111111111111111111111111112".to_string(),
-                output_lst_mint: "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm".to_string(),
+                output_lst_mint: INF_TOKEN.to_string(),
                 signer: self.keypair.pubkey().to_string(),
                 amount: sol_lamports_in.to_string(),
                 quoted_amount: quote_response.out_amount.unwrap_or(0.0).to_string(),
@@ -176,7 +215,7 @@ impl Account {
                 .await;
 
             match tx {
-                Ok(signature) => {
+                anyhow::Result::Ok(signature) => {
                     println!("SWAP|{} SOL > {} INF\nHash:{:?}",
                     sol_lamports_in as f64 / 1000000000.0,
                     self.inf_amount as f64 / 1000000000.0, 

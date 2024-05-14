@@ -8,13 +8,22 @@ use serde::{
     Deserialize,
     de::{self, Deserializer, Visitor}
 };
-use solana_sdk::signature::Keypair;
+use solana_sdk::{
+    signature::Keypair,
+    pubkey::Pubkey
+    };
 use std::{
     sync::Arc,
     str::FromStr
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use base64::engine::Engine;
+
+
+lazy_static::lazy_static! {
+    pub static ref INF_TOKEN: Pubkey = Pubkey::from_str("5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm")
+       .expect("failed to parse inf address");
+}
 
 
 #[derive(Debug, Deserialize, Clone)]
